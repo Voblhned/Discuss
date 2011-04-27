@@ -9,6 +9,9 @@ if (empty($scriptProperties['board'])) $modx->sendErrorPage();
 $board = $modx->call('disBoard','fetch',array(&$modx,$scriptProperties['board']));
 if ($board == null) $modx->sendErrorPage();
 
+if (!$board->checkPolicy('view')) {
+    $modx->sendErrorPage();
+}
 /* set meta */
 $discuss->setSessionPlace('board:'.$scriptProperties['board']);
 $discuss->setPageTitle($board->get('name'));
@@ -17,7 +20,6 @@ $discuss->setPageTitle($board->get('name'));
 if (!empty($scriptProperties['read']) && $discuss->isLoggedIn) {
     $board->read($discuss->user->get('id'));
 }
-
 $placeholders = $board->toArray();
 
 /* setup default properties */

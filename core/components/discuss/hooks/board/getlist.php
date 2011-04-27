@@ -77,6 +77,7 @@ if (!empty($scriptProperties['category'])) {
     ));
 }
 $groups = $discuss->user->getUserGroups();
+
 if (!empty($groups) && !$discuss->user->isAdmin) {
     /* restrict boards by user group if applicable */
     $g = array(

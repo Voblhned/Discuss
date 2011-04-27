@@ -223,5 +223,13 @@ $xpdo_meta_map['disBoard']= array (
       'cardinality' => 'many',
       'owner' => 'local',
     ),
+    'Acls' => 
+    array (
+      'class' => 'disBoardAccess',
+      'local' => 'id',
+      'foreign' => 'target',
+      'owner' => 'local',
+      'cardinality' => 'many',
+    ),
   ),
 );

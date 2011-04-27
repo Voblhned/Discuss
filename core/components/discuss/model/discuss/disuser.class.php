@@ -2,13 +2,112 @@
 /**
  * @package discuss
  */
-class disUser extends xPDOSimpleObject {
+class disUser extends modPrincipal {
     const INACTIVE = 0;
     const ACTIVE = 1;
     const UNCONFIRMED = 2;
     const BANNED = 3;
     const AWAITING_MODERATION = 4;
 
+
+    public function loadAttributes($target, $context = '',$reload = false) {
+        if ($target != 'disBoardAccess') return;
+        $context = !empty($context) ? $context : $this->xpdo->context->get('key');
+        if ($this->_attributes === null) {
+            $this->_attributes = array();
+            if (isset($_SESSION["modx.user.{$this->xpdo->user->id}.attributes"])) {
+                $this->_attributes = $_SESSION["modx.user.{$this->xpdo->user->id}.attributes"];
+            }
+        }
+        //unset($_SESSION["modx.user.{$this->xpdo->user->id}.attributes"]['web']['disBoardAccess']);
+        //var_dump($_SESSION["modx.user.{$this->xpdo->user->id}.attributes"]); die();
+        //$reload = true;
+        if (!isset($this->_attributes[$context])) $this->_attributes[$context] = array();
+        if (empty($this->_attributes[$context][$target]) || $reload) {
+            $accessTable = $this->xpdo->getTableName($target);
+            $policyTable = $this->xpdo->getTableName('modAccessPolicy');
+            $memberTable = $this->xpdo->getTableName('modUserGroupMember');
+            $memberRoleTable = $this->xpdo->getTableName('modUserGroupRole');
+            if ($this->get('id') > 0) {
+                switch ($target) {
+                    case 'disBoardAccess' :
+                        $boards = array();
+                        $sql = "SELECT acl.target, acl.principal, mr.authority, acl.policy, p.data FROM {$accessTable} acl " .
+                                "LEFT JOIN {$policyTable} p ON p.id = acl.policy " .
+                                "LEFT JOIN {$memberTable} mug ON acl.principal_class = 'modUserGroup' " .
+                                //"AND (acl.context_key = :context OR acl.context_key IS NULL OR acl.context_key = '') " .
+                                //"AND mug.member = :principal " .
+                                "AND mug.user_group = acl.principal " .
+                                "LEFT JOIN {$memberRoleTable} mr ON mr.id = mug.role " .
+                                "AND mr.authority <= acl.authority " .
+                                'WHERE
+                                    mug.member = :principal
+                                    OR acl.principal = 0
+                                ' .
+                                "ORDER BY acl.target, acl.principal, mr.authority, acl.policy";
+                        $bindings = array(
+                            ':principal' => $this->xpdo->user->get('id'),
+                            //':context' => $context,
+                        );
+                        $query = new xPDOCriteria($this->xpdo, $sql, $bindings);
+                        if ($query->stmt && $query->stmt->execute()) {
+                            while ($row = $query->stmt->fetch(PDO::FETCH_ASSOC)) {
+                                $this->_attributes[$context][$target][$row['target']][] = array(
+                                    'principal' => $row['principal'],
+                                    'authority' => $row['authority'],
+                                    'policy' => $row['data'] ? $this->xpdo->fromJSON($row['data'], true) : array(),
+                                );
+                                $boards[$row['target']]= $row['target'];
+                            }
+                        }
+                        //echo '<pre>';print_r($boards); die();
+                        $_SESSION['modx.user.'.$this->xpdo->user->get('id').'.disBoard'] = array(
+                            $context => array_values($boards),
+                         );
+                        break;
+                    default :
+                        break;
+                }
+            } else {
+                switch ($target) {
+                    case 'disBoardAccess' :
+                        $boards = array();
+                        $sql = "SELECT acl.target, acl.principal, 0 AS authority, acl.policy, p.data FROM {$accessTable} acl " .
+                                "LEFT JOIN {$policyTable} p ON p.id = acl.policy " .
+                                "WHERE acl.principal_class = 'modUserGroup' " .
+                                "AND acl.principal = 0 " .
+                                //"AND (acl.context_key = :context OR acl.context_key IS NULL OR acl.context_key = '') " .
+                                "ORDER BY acl.target, acl.principal, acl.authority, acl.policy";
+                        $bindings = array(
+                            ':context' => $context
+                        );
+                        $query = new xPDOCriteria($this->xpdo, $sql, $bindings);
+                        if ($query->stmt && $query->stmt->execute()) {
+                            while ($row = $query->stmt->fetch(PDO::FETCH_ASSOC)) {
+                                $this->_attributes[$context][$target][$row['target']][] = array(
+                                    'principal' => 0,
+                                    'authority' => $row['authority'],
+                                    'policy' => $row['data'] ? $this->xpdo->fromJSON($row['data'], true) : array(),
+                                );
+                                $boards[$row['target']]= $row['target'];
+                            }
+                        }
+                        var_dump($boards); die();
+
+                        $_SESSION['modx.user.'.$this->xpdo->user->get('id').'.disBoard'] = array(
+                            $context => array_values($boards),
+                         );
+                        break;
+                    default :
+                        break;
+                }
+            }
+            if (!isset($this->_attributes[$context][$target])) {
+                $this->_attributes[$context][$target] = array();
+            }
+            $_SESSION["modx.user.{$this->xpdo->user->id}.attributes"] = array_merge($_SESSION["modx.user.{$this->xpdo->user->id}.attributes"],$this->_attributes);
+        }
+    }
     /**
      * Gets the avatar URL for this user, depending on the avatar service.
      * @return string

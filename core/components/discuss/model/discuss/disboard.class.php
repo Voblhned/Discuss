@@ -5,18 +5,58 @@
  *
  * @package discuss
  */
-class disBoard extends xPDOSimpleObject {
+class disBoard extends disAccessibleSimpleObject {
     /**
      *  @var boolean $parentChanged Monitors whether parent has been changed.
      *  @access protected
      */
     protected $parentChanged = false;
 
+
+
+    public function findPolicy($context = '') {
+        $policy = array();
+        $context = !empty($context) ? $context : $this->xpdo->context->get('key');
+        if (empty($this->_policies) || !isset($this->_policies[$context])) {
+            $accessTable = $this->xpdo->getTableName('disBoardAccess');
+            $policyTable = $this->xpdo->getTableName('modAccessPolicy');
+            $boardTable = $this->xpdo->getTableName('disBoard');
+            $sql = "SELECT Acl.target, Acl.principal, Acl.authority, Acl.policy, Policy.data FROM {$accessTable} Acl " .
+                    "LEFT JOIN {$policyTable} Policy ON Policy.id = Acl.policy " .
+                    "JOIN {$boardTable} Board ON Board.id = Acl.target AND Board.id = :board " .
+                    //"AND (Acl.context_key = :context OR Acl.context_key IS NULL OR Acl.context_key = '') " .
+                    "WHERE Acl.principal_class = :principal_class " .
+                    "GROUP BY Acl.target, Acl.principal, Acl.authority, Acl.policy";
+            $bindings = array(
+                ':board' => $this->get('id'),
+                //':context' => $context,
+                ':principal_class' => 'modUserGroup',
+            );
+            $query = new xPDOCriteria($this->xpdo, $sql, $bindings);
+            if ($query->stmt && $query->stmt->execute()) {
+                while ($row = $query->stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $policy['disBoardAccess'][$row['target']][] = array(
+                        'principal' => $row['principal'],
+                        'authority' => $row['authority'],
+                        'policy' => $row['data'] ? $this->xpdo->fromJSON($row['data'], true) : array(),
+                    );
+                }
+            }
+            $this->_policies[$context] = $policy;
+        } else {
+            $policy = $this->_policies[$context];
+        }
+        return $policy;
+    }
+
     /**
      * Overrides xPDOObject::set to provide custom functionality and automation
      * for the closure tables that persist the board map.
      *
-     * {@inheritDoc}
+     * @param string $k
+     * @param string $v
+     * @param string $vType
+     * @return string
      */
     public function set($k, $v= null, $vType= '') {
         $oldParentId = $this->get('parent');
@@ -37,7 +77,8 @@ class disBoard extends xPDOSimpleObject {
      * Overrides the xPDOObject::save method to provide custom functionality and
      * automation for the closure tables that persist the board map.
      *
-     * {@inheritDoc}
+     * @param boolean $cacheFlag
+     * @return boolean
      */
     public function save($cacheFlag = null) {
         $new = $this->isNew();

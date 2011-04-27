@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <model package="discuss" baseClass="xPDOObject" platform="mysql" defaultEngine="MyISAM">    
+
+    <object class="disAccessibleObject" extends="xPDOObject" />
+
+    <object class="disAccessibleSimpleObject" extends="disAccessibleObject">
+        <field key="id" dbtype="int" precision="10" attributes="unsigned" phptype="integer" null="false" index="pk" generated="native" />
+
+        <index alias="PRIMARY" name="PRIMARY" primary="true" unique="true" type="BTREE">
+            <column key="id" length="" collation="A" null="false" />
+        </index>
+    </object>
     
     <object class="disBanGroup" table="discuss_ban_groups" extends="xPDOSimpleObject">
         <field key="name" dbtype="varchar" precision="100" phptype="string" null="false" default="" />
@@ -29,8 +39,19 @@
         <aggregate alias="BanGroup" class="disBanGroup" local="grp" foreign="id" cardinality="one" owner="foreign" />
         <aggregate alias="User" class="disUser" local="user" foreign="id" cardinality="one" owner="foreign" />
     </object>
+
+    <object class="disBoardAccess" table="discuss_board_access" extends="modAccess">
+        <field key="context_key" dbtype="varchar" precision="100" phptype="string" null="false" default="" index="fk" />
+
+        <index alias="context_key" name="context_key" primary="false" unique="false" type="BTREE">
+            <column key="context_key" length="" collation="A" null="false" />
+        </index>
+
+        <aggregate alias="Target" class="disBoard" local="target" foreign="id" owner="foreign" cardinality="one" />
+        <aggregate alias="Context" class="modContext" local="context_key" foreign="key" cardinality="one" owner="foreign" />
+    </object>
     
-    <object class="disBoard" table="discuss_boards" extends="xPDOSimpleObject">
+    <object class="disBoard" table="discuss_boards" extends="disAccessibleSimpleObject">
         <field key="category" dbtype="int" precision="10" phptype="integer" attributes="unsigned" null="false" default="0" index="index" />
         <field key="parent" dbtype="int" precision="10" phptype="integer" attributes="unsigned" null="false" default="0" index="index" />
         <field key="name" dbtype="varchar" precision="255" phptype="string" default="" null="false" index="index" />
@@ -55,6 +76,7 @@
         <composite alias="PostReads" class="disPostRead" local="id" foreign="board" cardinality="many" owner="local" />
         <aggregate alias="LastPost" class="disPost" local="last_post" foreign="id" cardinality="many" owner="foreign" />
         <composite alias="Notifications" class="disUserNotification" local="id" foreign="board" cardinality="many" owner="local" />
+        <composite alias="Acls" class="disBoardAccess" local="id" foreign="target" owner="local" cardinality="many" />
     </object>
     
     <object class="disBoardClosure" table="discuss_boards_closure" extends="xPDOObject">

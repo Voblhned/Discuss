@@ -52,6 +52,9 @@ class Discuss {
             'loadJQuery' => true,
         ),$config);
 
+        $this->modx->setLogTarget('ECHO');
+        $this->modx->loadClass('disAccessibleObject',$this->config['modelPath'].'discuss/');
+        $this->modx->loadClass('disAccessibleSimpleObject',$this->config['modelPath'].'discuss/');
         $this->modx->addPackage('discuss',$this->config['modelPath']);
         $this->ssoMode = $this->modx->getOption('discuss.sso_mode',$config,false);
     }
@@ -64,6 +67,7 @@ class Discuss {
      *
      * @access public
      * @param string $ctx The context to load. Defaults to web.
+     * @return string
      */
     public function initialize($ctx = 'web') {
         $this->loadHooks();
@@ -140,6 +144,7 @@ class Discuss {
         $this->isLoggedIn = $this->modx->user->hasSessionContext($this->modx->context->get('key'));
         if (!$this->isLoggedIn) {
             $this->user =& $this->modx->newObject('disUser');
+            $this->user->set('id',0);
             $this->user->set('user',0);
             $this->user->set('username','(anonymous)');
         } else {
@@ -181,6 +186,8 @@ class Discuss {
                 $this->user->save();
             }
         }
+
+        //$this->user->loadAttributes();
 
         /* topbar profile links. @TODO: Move this somewhere else. */
         if ($this->isLoggedIn) {
@@ -241,7 +248,7 @@ class Discuss {
             $activity->set('hits',($activity->get('hits')+1));
             $activity->save();
         }
-        $session->set('user',$this->user->get('id'));
+        $session->set('user',$this->user->get('id') > 0 ? $this->user->get('id') : 0);
         $session->set('access',time());
         $session->set('data','');
         $session->save();
